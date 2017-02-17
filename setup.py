@@ -20,7 +20,8 @@ setup(
         "pytz",
         "six",
         "parsel",
-        "urllib3"
+        "urllib3",
+        "lazy-object-proxy"
     ],
     extras_require={
         'secure': extras_secure,

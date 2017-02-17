@@ -1,7 +1,7 @@
 from nameko.rpc import rpc
 from scrapel import Scrapel, Request, Response
-from scrapel.middlewares.spider import PROCESS_INPUT, PROCESS_OUTPUT, PROCESS_EXCEPTION
-from scrapel.middlewares.download import PROCESS_REQUEST, PROCESS_RESPONSE, PROCESS_EXCEPTION
+from scrapel.middleware.spider import PROCESS_INPUT, PROCESS_OUTPUT, PROCESS_EXCEPTION
+from scrapel.middleware.download import PROCESS_REQUEST, PROCESS_RESPONSE, PROCESS_EXCEPTION
 
 
 class MyClass(object):

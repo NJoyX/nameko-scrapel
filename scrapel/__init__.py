@@ -5,4 +5,4 @@ from .request import Request
 from .response import Response
 
 __author__ = 'Fill Q'
-
+__all__ = ['Scrapel']

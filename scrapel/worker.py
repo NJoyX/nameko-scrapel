@@ -1,37 +1,35 @@
 from __future__ import unicode_literals, print_function, absolute_import
 
-from functools import partial
-
 import eventlet
 
-from .collector import ScrapelMiddlewareCollector
+from .collectors import ScrapelCollector
+from .constants import JOBID
+from .request import Request
+from .response import Response
+from .settings import Settings
 from .transport import Urllib3Transport
 from .utils import maybe_iterable
-from .settings import Settings
 
 __author__ = 'Fill Q'
+__all__ = ['ScrapelWorker']
 
 
 class ScrapelWorker(object):
-    settings = Settings()
+    collector = ScrapelCollector()
 
-    collector = ScrapelMiddlewareCollector()
-    pool = eventlet.GreenPool(1)
-    rQueue = eventlet.Queue(1)
-    finish = eventlet.Event()
-
-    def __init__(self, max_workers, start_requests_func, transport=Urllib3Transport):
-        self.context = None
-        self.max_workers = max_workers
+    def __init__(self, context, job_id, start_requests_func, transport=Urllib3Transport):
+        self.context = context
+        self.job_id = job_id
         self.start_requests_func = start_requests_func
         self.transport = transport
-        self.rQueue.resize(self.max_workers)
-        self.pool.resize(self.max_workers)
-        self._running = False
 
-    def setup(self, context):
-        self.context = context
+        self.settings = Settings()
+        self.settings.setdefault(JOBID, self.job_id)
         self.collector = self.collector.bind(self.container)
+        self.event = eventlet.Event()
+        self.pool = eventlet.GreenPool()
+        self.queue = eventlet.Queue()
+        self.results = set()
 
     @property
     def container(self):
@@ -42,42 +40,67 @@ class ScrapelWorker(object):
         return self.context.config
 
     @property
-    def free(self):
-        return self.pool.free()
+    def is_running(self):
+        return self.event.ready() is False
 
-    def stop(self):
-        self._running = False
-        if not self.finish.ready():
-            self.finish.send(None)
-        self.pool.waitall()
-        # self.container._died.send(None)
+    def stop(self, result=None):
+        if self.is_running:
+            self.event.send(result)
+            self.pool.waitall()
+            # self.container._died.send(None)
 
-    def run(self, job_id):
-        self._running = True
+    def spawn(self, fn, *args, **kwargs):
+        if not callable(fn):
+            fn = lambda *a, **kw: None
+        return self.pool.spawn(fn, *args, **kwargs)
 
-        pile = eventlet.greenpool.GreenPile(self.pool)
-        pile.spawn(partial(self.start_requests_func, self.context.service))
-        self.rQueue.put_nowait(pile)
+    def pile(self, fn, *args, **kwargs):
+        if not callable(fn):
+            fn = lambda *a, **kw: None
+        _pile = eventlet.GreenPile(self.pool)
+        _pile.spawn(fn, *args, **kwargs)
+        return maybe_iterable(_pile)
+
+    def map(self, fn, *args, **kwargs):
+        if not callable(fn):
+            fn = lambda *a, **kw: None
+        _map = eventlet.greenpool.GreenMap(self.pool)
+        _map.spawn(fn, *args, **kwargs)
+        return maybe_iterable(_map)
+
+    def run(self):
+        self.queue.put(self.pile(self.start_requests_func, self.context.service))
 
         while True:
-            if self.finish.ready():
+            if not self.is_running:
                 break
 
-            while not self.rQueue.empty():
-                items = self.rQueue.get()
-                # process item
-                self.pool.spawn_n(self.process, items, job_id, self.rQueue)
+            while not self.queue.empty():
+                items = self.queue.get()
+                # processing items
+                gt = self.spawn(self.process, items)
+                gt.link(lambda result: self.update_results(result.wait()))
             self.pool.waitall()
-            if self.rQueue.empty():
-                self.stop()
-                break
-        return job_id
+            if self.queue.empty():
+                self.stop(self.results)
 
-    def process(self, items, job_id, queue):
+        return self.event.wait()
+
+    def process(self, items):
         results = []
-        settings = self.settings.copy()
-        settings['JOBID'] = job_id
         for item in maybe_iterable(items):
-            if hasattr(item, 'process'):
-                results.append(item.process(collector=self.collector, context=self.context, settings=settings))
+            result = None
+            if isinstance(item, Request):
+                result = self.pile(self.collector.process_request, request=item, transport=self.transport,
+                                   worker=self, settings=self.settings.copy())
+            elif isinstance(item, Response):
+                result = self.pile(self.collector.process_response,
+                                   response=item, worker=self, settings=self.settings.copy())
+            # @TODO implement for pipeline
+            # elif isinstance(item, ScrapelItem):
+            #     result = self.spawn(self.collector.process_item, item=item, settings=self.settings)
+            results.extend(list(maybe_iterable(result)))
         return filter(None, results)
+
+    def update_results(self, result):
+        self.results.update(filter(None, maybe_iterable(result)))

@@ -1,0 +1,3 @@
+
+class NoFreeSlotsAvailable(Exception):
+    pass

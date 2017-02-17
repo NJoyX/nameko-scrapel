@@ -6,5 +6,12 @@ from .spider import SpiderExceptionMiddleware, SpiderInputMiddleware, SpiderOutp
 
 __author__ = 'Fill Q'
 
-__all__ = ['RequestMiddleware', 'ResponseMiddleware', 'ExceptionMiddleware', 'SpiderOutputMiddleware',
-           'SpiderInputMiddleware', 'SpiderExceptionMiddleware', 'BaseMiddleware']
+__all__ = [
+    'RequestMiddleware',
+    'ResponseMiddleware',
+    'ExceptionMiddleware',
+    'SpiderOutputMiddleware',
+    'SpiderInputMiddleware',
+    'SpiderExceptionMiddleware',
+    'BaseMiddleware'
+]
