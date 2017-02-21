@@ -12,5 +12,8 @@ __all__ = ['RequestMiddleware']
 class RequestMiddleware(BaseMiddleware):
     collector = DownloadMiddlewareCollector()
 
-    def __init__(self, *args, **kwargs):
-        super(RequestMiddleware, self).__init__(*args, **kwargs)
+    # def __init__(self, priority=9999, *args, **kwargs):
+    #     # self.method = method
+    #     print(args, kwargs)
+    #     self.priority = priority
+    #     super(RequestMiddleware, self).__init__(*args, **kwargs)

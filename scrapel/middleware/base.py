@@ -1,4 +1,7 @@
-from nameko.extensions import Entrypoint, ProviderCollector, SharedExtension
+import types
+from functools import partial
+
+from nameko.extensions import Entrypoint, ProviderCollector, SharedExtension, register_entrypoint
 from scrapel.collectors import ScrapelCollector
 from scrapel.constants import MIDDLEWARE_METHODS
 
@@ -13,7 +16,7 @@ def raise_notimplemented():
 
 class BaseMiddleware(Entrypoint):
     collector = property(lambda self: raise_notimplemented())
-    priority = 99
+    priority = 9999
     method = None
 
     def start(self):
@@ -27,6 +30,18 @@ class BaseMiddleware(Entrypoint):
         self.priority = priority or self.priority
         assert method in MIDDLEWARE_METHODS, 'Use only predefined methods'
         self.method = method
+
+    @classmethod
+    def decorator(cls, *args, **kwargs):
+        def registering_decorator(fn, a, kw):
+            instance = cls(*a, **kw)
+            register_entrypoint(fn, instance)
+            return fn
+
+        if len(args) >= 1 and isinstance(args[0], types.FunctionType):
+            return registering_decorator(args[0], a=args[1:], kw=kwargs)
+
+        return partial(registering_decorator, a=args, kw=kwargs)
 
 
 class BaseMiddlewareCollector(ProviderCollector, SharedExtension):

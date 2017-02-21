@@ -8,11 +8,6 @@ from .response import Response
 
 
 class ScrapelCollector(ProviderCollector, SharedExtension):
-    def start(self):
-        # print dir(self), self.sharing_key
-        # print self.container, self._providers
-        pass
-
     @property
     def download_middlewares(self):
         return filter(lambda p: getattr(p, 'method', None) in (DOWNLOAD_METHOD,), self._providers)
@@ -27,11 +22,13 @@ class ScrapelCollector(ProviderCollector, SharedExtension):
 
     def process_request(self, request, transport, worker, settings):
         job_id = self.job_id(settings)
-        pprocess = partial(self.post_process, worker)
-        for dlmiddleware in self.download_middlewares:
-            if get_callable(dlmiddleware, 'process'):
-                gt = worker.spawn(dlmiddleware.process, request, transport, settings, job_id)
-                gt.link(lambda result: pprocess(result.wait()))
+        post_process = partial(self.post_process, worker)
+        for dlm in self.download_middlewares:
+            _callback = get_callable(dlm, 'process')
+            if _callback is None:
+                continue
+            gt = worker.spawn(_callback, request, transport, settings, job_id, worker.context)
+            gt.link(lambda result: post_process(result.wait()))
 
     @staticmethod
     def post_process(worker, result):
@@ -43,11 +40,13 @@ class ScrapelCollector(ProviderCollector, SharedExtension):
     def process_response(self, response, worker, settings):
         job_id = self.job_id(settings)
         request = response.request
-        pprocess = partial(self.post_process, worker)
-        for spmiddleware in self.spider_middlewares:
-            if get_callable(spmiddleware, 'process'):
-                gt = worker.spawn(spmiddleware.process, response, request, settings, job_id)
-                gt.link(lambda result: pprocess(result.wait()))
+        post_process = partial(self.post_process, worker)
+        for spm in self.spider_middlewares:
+            _callback = get_callable(spm, 'process')
+            if _callback is None:
+                continue
+            gt = worker.spawn(_callback, response, request, settings, job_id, worker.context)
+            gt.link(lambda result: post_process(result.wait()))
 
     def process_item(self, item, settings):
         job_id = self.job_id(settings)

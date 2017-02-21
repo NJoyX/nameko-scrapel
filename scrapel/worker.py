@@ -25,6 +25,7 @@ class ScrapelWorker(object):
 
         self.settings = Settings()
         self.settings.setdefault(JOBID, self.job_id)
+        self.settings.setdefault('BLALBA', None)
         self.collector = self.collector.bind(self.container)
         self.event = eventlet.Event()
         self.pool = eventlet.GreenPool()
@@ -38,6 +39,10 @@ class ScrapelWorker(object):
     @property
     def config(self):
         return self.context.config
+
+    @property
+    def service(self):
+        return self.context.service
 
     @property
     def is_running(self):
@@ -63,13 +68,13 @@ class ScrapelWorker(object):
 
     def map(self, fn, *args, **kwargs):
         if not callable(fn):
-            fn = lambda *a, **kw: None
+            fn = (lambda *a, **kw: None)
         _map = eventlet.greenpool.GreenMap(self.pool)
         _map.spawn(fn, *args, **kwargs)
         return maybe_iterable(_map)
 
     def run(self):
-        self.queue.put(self.pile(self.start_requests_func, self.context.service))
+        self.queue.put(self.pile(self.start_requests_func, self.context.service, self.job_id))
 
         while True:
             if not self.is_running:
@@ -91,11 +96,11 @@ class ScrapelWorker(object):
         for item in maybe_iterable(items):
             result = None
             if isinstance(item, Request):
-                result = self.pile(self.collector.process_request, request=item, transport=self.transport,
-                                   worker=self, settings=self.settings.copy())
+                self.pile(self.collector.process_request, request=item, transport=self.transport,
+                          worker=self, settings=self.settings.copy())
             elif isinstance(item, Response):
-                result = self.pile(self.collector.process_response,
-                                   response=item, worker=self, settings=self.settings.copy())
+                self.pile(self.collector.process_response,
+                          response=item, worker=self, settings=self.settings.copy())
             # @TODO implement for pipeline
             # elif isinstance(item, ScrapelItem):
             #     result = self.spawn(self.collector.process_item, item=item, settings=self.settings)
