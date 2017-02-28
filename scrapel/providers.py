@@ -1,11 +1,11 @@
 from __future__ import unicode_literals, print_function, absolute_import
 
-import uuid
 import weakref
 from functools import partial
 
 from nameko.constants import DEFAULT_MAX_WORKERS, MAX_WORKERS_CONFIG_KEY
 from nameko.extensions import DependencyProvider
+from nameko.utils import SpawningProxy
 
 from .constants import (
     MIDDLEWARE_REQUEST_METHOD,
@@ -16,7 +16,6 @@ from .constants import (
     JOBID
 )
 from .exceptions import NoFreeSlotsAvailable
-from .handler import handler, getter
 from .middleware import (
     RequestMiddleware,
     ResponseMiddleware,
@@ -27,22 +26,15 @@ from .middleware import (
 )
 from .settings import Settings
 from .transport import BaseTransport, Urllib3Transport
-from .utils import try_int
-from .worker import ScrapelWorker
+from .utils import try_int, FunctionSetMixin
+from .worker import ScrapelWorker, FakeWorker
 
 __author__ = 'Fill Q'
 
 CONCURRENCY = int(DEFAULT_MAX_WORKERS / 2)
 
 
-class Scrapel(DependencyProvider):
-    request_middleware = partial(RequestMiddleware.decorator, method=MIDDLEWARE_REQUEST_METHOD)
-    response_middleware = partial(ResponseMiddleware.decorator, method=MIDDLEWARE_RESPONSE_METHOD)
-    exception_middleware = partial(ExceptionMiddleware.decorator, method=MIDDLEWARE_EXCEPTION_METHOD)
-    spider_input_middleware = partial(SpiderInputMiddleware.decorator, method=MIDDLEWARE_INPUT_METHOD)
-    spider_output_middleware = partial(SpiderOutputMiddleware.decorator, method=MIDDLEWARE_OUTPUT_METHOD)
-    spider_exception_middleware = partial(SpiderExceptionMiddleware.decorator, method=MIDDLEWARE_EXCEPTION_METHOD)
-
+class Scrapel(FunctionSetMixin, DependencyProvider):
     def __init__(self, allowed_domains, concurrency=CONCURRENCY, transport=Urllib3Transport):
         self.allowed_domains = allowed_domains
         self.transport = transport if issubclass(transport, BaseTransport) else Urllib3Transport
@@ -55,24 +47,26 @@ class Scrapel(DependencyProvider):
 
     def get_dependency(self, worker_ctx):
         return type(str('Scrapel'), (), dict(
-            start=partial(self._start_process, worker_ctx),
-            stop=self._stop_worker,
+            start=partial(self.start_worker, worker_ctx),
+            stop=self.stop_worker,
             free=self.free,
             config=self.container.config,
             settings=self.settings
         ))
 
-    def worker_cls(self, context, job_id):
+    def worker_cls(self, context, job_id, **settings):
         return ScrapelWorker(
             context=context,
             job_id=job_id,
-            start_requests_func=getter.start_requests,
-            transport=self.transport
+            transport=self.transport,
+            **settings
         )
 
-    def _start_process(self, context, job_id=None):
-        if job_id is None:
-            job_id = uuid.uuid4().hex
+    def stop_worker(self, job_id):
+        SpawningProxy([self.jobs.pop(job_id, FakeWorker())]).stop()
+
+    def start_worker(self, context, job_id=None, **settings):
+        job_id = job_id or context.call_id
 
         if job_id in self.jobs:
             return job_id
@@ -80,29 +74,24 @@ class Scrapel(DependencyProvider):
         if not self.free:
             raise NoFreeSlotsAvailable('No free slots available')
 
-        worker = self.worker_cls(context=context, job_id=job_id)
+        worker = self.worker_cls(context=context, job_id=job_id, **settings)
         self.jobs[job_id] = worker
 
-        if callable(getter.on_start):
-            worker.pile(getter.on_start, context.service)
         gt = self.container.spawn_managed_thread(
-            worker.run,
+            partial(worker.on_start, jid=job_id),
             identifier='<Scrapel Worker with JobID: {} at {}>'.format(job_id, id(worker))
         )
-        if not callable(getter.on_stop):
-            on_stop = partial(lambda this, gthread, result: print(result.wait()), self, gt)
-        else:
-            on_stop = partial(getter.on_stop, context.service, gt)
-        gt.link(lambda result: on_stop(result))
+        gt.link(worker.run)
+        gt.link(lambda _, jid: self.jobs.pop(jid, None), job_id)
         return job_id
 
-    def _stop_worker(self, job_id):
-        if job_id in self.jobs:
-            self.jobs[job_id].stop()
+    @property
+    def running(self):
+        return filter(lambda j: j.is_running, self.jobs.values())
 
     @property
     def free(self):
-        return len(filter(lambda j: j.is_running, self.jobs.values())) < self.concurrency
+        return len(self.running) < self.concurrency
 
     def settings(self, job_id):
         return getattr(self.jobs.get(job_id), 'settings', Settings(**{JOBID: job_id}))
@@ -112,15 +101,17 @@ class Scrapel(DependencyProvider):
         return super(Scrapel, self).start()
 
     def stop(self):
-        map(lambda w: w.stop(), self.jobs.values())
+        SpawningProxy(self.running).stop()
         return super(Scrapel, self).stop()
 
     def kill(self):
-        map(lambda w: w.stop(), self.jobs.values())
+        SpawningProxy(self.running).stop()
         return super(Scrapel, self).kill()
 
-    # Custom functions
-    on_start = handler.on_start
-    on_stop = handler.on_stop
-    pipeline = handler.pipeline
-    start_requests = handler.start_requests
+    # Entrypoints
+    request_middleware = partial(RequestMiddleware.decorator, method=MIDDLEWARE_REQUEST_METHOD)
+    response_middleware = partial(ResponseMiddleware.decorator, method=MIDDLEWARE_RESPONSE_METHOD)
+    exception_middleware = partial(ExceptionMiddleware.decorator, method=MIDDLEWARE_EXCEPTION_METHOD)
+    spider_input_middleware = partial(SpiderInputMiddleware.decorator, method=MIDDLEWARE_INPUT_METHOD)
+    spider_output_middleware = partial(SpiderOutputMiddleware.decorator, method=MIDDLEWARE_OUTPUT_METHOD)
+    spider_exception_middleware = partial(SpiderExceptionMiddleware.decorator, method=MIDDLEWARE_EXCEPTION_METHOD)

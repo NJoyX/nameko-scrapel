@@ -1,6 +1,10 @@
-from eventlet.support import six
+from __future__ import unicode_literals, print_function, absolute_import
 
-from .constants import MIDDLEWARE_METHODS
+from eventlet.support import six
+from scrapel.constants import MIDDLEWARE_METHODS
+
+__author__ = 'Fill Q'
+__all__ = ['maybe_iterable', 'valid_providers', 'get_callable', 'try_int']
 
 
 def maybe_iterable(items):

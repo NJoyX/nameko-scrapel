@@ -21,7 +21,8 @@ setup(
         "six",
         "parsel",
         "urllib3",
-        "lazy-object-proxy"
+        "lazy-object-proxy",
+        "sortedcontainers"
     ],
     extras_require={
         'secure': extras_secure,
