@@ -6,6 +6,8 @@ __all__ = ['Request']
 
 
 class Request(object):
+    # @TODO implement errback
+
     def __init__(self, url, callback, headers=None, dont_filter=False):
         self.url = url
         self.callback = callback

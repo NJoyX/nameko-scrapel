@@ -1,35 +1,69 @@
 import types
 from functools import partial
 
-from nameko.extensions import Entrypoint, ProviderCollector, SharedExtension, register_entrypoint
-from scrapel.collectors import ScrapelCollector
-from scrapel.constants import MIDDLEWARE_METHODS
+from nameko.exceptions import IncorrectSignature
+from nameko.extensions import Entrypoint, register_entrypoint
+from scrapel.constants import (
+    MIDDLEWARE_METHODS,
+    MIDDLEWARE_DOWNLOADER_REQUEST_METHOD,
+    MIDDLEWARE_DOWNLOADER_RESPONSE_METHOD,
+    MIDDLEWARE_DOWNLOADER_EXCEPTION_METHOD,
+    MIDDLEWARE_SPIDER_INPUT_METHOD,
+    MIDDLEWARE_SPIDER_OUTPUT_METHOD,
+    MIDDLEWARE_SPIDER_EXCEPTION_METHOD
+)
+from scrapel.engine import ScrapelEngine
 
 __author__ = 'Fill Q'
 
-__all__ = ['BaseMiddleware']
+__all__ = [
+    'DownloaderRequestMiddleware', 'DownloaderResponseMiddleware', 'DownloaderExceptionMiddleware',
+    'SpiderInputMiddleware', 'SpiderOutputMiddleware', 'SpiderExceptionMiddleware'
+]
+
+raise_notimplemented = partial(NotImplementedError, 'Implement Collector')
+raise_mustimplemented = partial(NotImplementedError, 'Must be implemented')
 
 
-def raise_notimplemented():
-    raise NotImplementedError('Implement Collector')
-
-
-class BaseMiddleware(Entrypoint):
-    collector = property(lambda self: raise_notimplemented())
+class MiddlewareBase(Entrypoint):
+    collector = ScrapelEngine()
     priority = 9999
     method = None
+    dispatch_uid = None
 
     def start(self):
+        if self.dispatch_uid is None:
+            self.dispatch_uid = self._default_dispatch_uid
         self.collector.register_provider(self)
 
     def stop(self):
         self.collector.unregister_provider(self)
-        super(BaseMiddleware, self).stop()
+        super(MiddlewareBase, self).stop()
 
-    def __init__(self, method, priority=None):
+    def __init__(self, priority=None, dispatch_uid=None):
         self.priority = priority or self.priority
-        assert method in MIDDLEWARE_METHODS, 'Use only predefined methods'
-        self.method = method
+        assert self.method in MIDDLEWARE_METHODS, 'Use only predefined methods'
+        self.dispatch_uid = dispatch_uid
+
+    @property
+    def _default_dispatch_uid(self):
+        return ':'.join([
+            self.container.service_name,
+            self.method_name
+        ])
+
+    def process(self, worker, *args, **kwargs):
+        new_kwargs = kwargs.copy()
+        new_kwargs['worker'] = worker
+        try:
+            self.check_signature(*args, **new_kwargs)
+            service_cls = self.container.service_cls
+            fn = getattr(service_cls, self.method_name)
+            return worker.map(fn, worker.context.service, *args, **kwargs)
+        except IncorrectSignature:
+            pass
+        except Exception as exc:
+            return exc
 
     @classmethod
     def decorator(cls, *args, **kwargs):
@@ -44,13 +78,25 @@ class BaseMiddleware(Entrypoint):
         return partial(registering_decorator, a=args, kw=kwargs)
 
 
-class BaseMiddlewareCollector(ProviderCollector, SharedExtension):
-    method = None
-    parent_collector = ScrapelCollector()
+class DownloaderRequestMiddleware(MiddlewareBase):
+    method = MIDDLEWARE_DOWNLOADER_REQUEST_METHOD
 
-    def start(self):
-        self.parent_collector.register_provider(self)
 
-    def stop(self):
-        self.parent_collector.unregister_provider(self)
-        super(BaseMiddlewareCollector, self).stop()
+class DownloaderResponseMiddleware(MiddlewareBase):
+    method = MIDDLEWARE_DOWNLOADER_RESPONSE_METHOD
+
+
+class DownloaderExceptionMiddleware(MiddlewareBase):
+    method = MIDDLEWARE_DOWNLOADER_EXCEPTION_METHOD
+
+
+class SpiderInputMiddleware(MiddlewareBase):
+    method = MIDDLEWARE_SPIDER_INPUT_METHOD
+
+
+class SpiderOutputMiddleware(MiddlewareBase):
+    method = MIDDLEWARE_SPIDER_OUTPUT_METHOD
+
+
+class SpiderExceptionMiddleware(MiddlewareBase):
+    method = MIDDLEWARE_SPIDER_EXCEPTION_METHOD

@@ -1,6 +1,6 @@
 from functools import partial
 
-from six import PY2
+from eventlet.support.six import PY2
 
 if PY2:
     class partialmethod(partial):

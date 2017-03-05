@@ -3,7 +3,7 @@ from __future__ import unicode_literals, print_function, absolute_import
 import eventlet
 from sortedcontainers import SortedSet
 
-from .collectors import ScrapelCollector
+from .engine import ScrapelEngine
 from .constants import JOBID
 from .request import Request
 from .response import Response
@@ -18,7 +18,7 @@ DEFAULT_SET_LOAD = 10000
 
 
 class ScrapelWorker(FunctionGetMixin):
-    collector = ScrapelCollector()
+    engine = ScrapelEngine()
 
     def __init__(self, context, job_id, transport=Urllib3Transport, **extra):
         self.context = context
@@ -28,7 +28,7 @@ class ScrapelWorker(FunctionGetMixin):
         self.settings = Settings()
         self.settings.setdefault(JOBID, self.jid)
         self.settings.update(extra)
-        self.collector = self.collector.bind(self.container)
+        self.engine = self.engine.bind(self.container)
         self.event = eventlet.Event()
         self.pool = eventlet.GreenPool()
         self.queue = eventlet.Queue()
@@ -61,10 +61,9 @@ class ScrapelWorker(FunctionGetMixin):
         if self.is_running:
             self.event.send(result)
 
-        results = self.event.wait() or self.defaultset
-        results.difference_update(result)
-        results.difference_update(self.results)
-        self.map(self.on_stop, results, self.jid)
+        self.map(self.on_stop, results=set(
+            self.event.wait() or self.defaultset | result | self.results
+        ), jid=self.jid)
         self.pool.waitall()
 
     def spawn(self, fn, *args, **kwargs):
@@ -102,21 +101,19 @@ class ScrapelWorker(FunctionGetMixin):
             if self.queue.empty():
                 self.stop(self.results)
 
-        self.event.wait()
+        return self.event.wait()
 
     def process(self, items):
         results = []
         for item in maybe_iterable(items):
             result = None
             if isinstance(item, Request):
-                self.pile(self.collector.process_request, request=item, transport=self.transport,
-                          worker=self, settings=self.settings.copy())
+                self.engine.process_request(request=item, worker=self, settings=self.settings)
             elif isinstance(item, Response):
-                self.pile(self.collector.process_response,
-                          response=item, worker=self, settings=self.settings.copy())
+                self.engine.process_response(response=item, worker=self, settings=self.settings)
             # @TODO implement for pipeline
             # elif isinstance(item, ScrapelItem):
-            #     result = self.spawn(self.collector.process_item, item=item, settings=self.settings)
+            #     result = self.spawn(self.engine.process_item, item=item, settings=self.settings)
             results.extend(maybe_iterable(result))
         return filter(None, results)
 

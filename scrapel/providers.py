@@ -7,19 +7,12 @@ from nameko.constants import DEFAULT_MAX_WORKERS, MAX_WORKERS_CONFIG_KEY
 from nameko.extensions import DependencyProvider
 from nameko.utils import SpawningProxy
 
-from .constants import (
-    MIDDLEWARE_REQUEST_METHOD,
-    MIDDLEWARE_RESPONSE_METHOD,
-    MIDDLEWARE_INPUT_METHOD,
-    MIDDLEWARE_OUTPUT_METHOD,
-    MIDDLEWARE_EXCEPTION_METHOD,
-    JOBID
-)
+from .constants import JOBID
 from .exceptions import NoFreeSlotsAvailable
 from .middleware import (
-    RequestMiddleware,
-    ResponseMiddleware,
-    ExceptionMiddleware,
+    DownloaderRequestMiddleware,
+    DownloaderResponseMiddleware,
+    DownloaderExceptionMiddleware,
     SpiderInputMiddleware,
     SpiderOutputMiddleware,
     SpiderExceptionMiddleware
@@ -109,9 +102,9 @@ class Scrapel(FunctionSetMixin, DependencyProvider):
         return super(Scrapel, self).kill()
 
     # Entrypoints
-    request_middleware = partial(RequestMiddleware.decorator, method=MIDDLEWARE_REQUEST_METHOD)
-    response_middleware = partial(ResponseMiddleware.decorator, method=MIDDLEWARE_RESPONSE_METHOD)
-    exception_middleware = partial(ExceptionMiddleware.decorator, method=MIDDLEWARE_EXCEPTION_METHOD)
-    spider_input_middleware = partial(SpiderInputMiddleware.decorator, method=MIDDLEWARE_INPUT_METHOD)
-    spider_output_middleware = partial(SpiderOutputMiddleware.decorator, method=MIDDLEWARE_OUTPUT_METHOD)
-    spider_exception_middleware = partial(SpiderExceptionMiddleware.decorator, method=MIDDLEWARE_EXCEPTION_METHOD)
+    request_middleware = DownloaderRequestMiddleware.decorator
+    response_middleware = DownloaderResponseMiddleware.decorator
+    exception_middleware = DownloaderExceptionMiddleware.decorator
+    spider_input_middleware = SpiderInputMiddleware.decorator
+    spider_output_middleware = SpiderOutputMiddleware.decorator
+    spider_exception_middleware = SpiderExceptionMiddleware.decorator
