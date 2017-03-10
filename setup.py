@@ -19,6 +19,7 @@ setup(
         "marshmallow",
         "pytz",
         "six",
+        "w3lib",
         "parsel",
         "urllib3",
         "lazy-object-proxy",

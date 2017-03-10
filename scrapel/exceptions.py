@@ -4,3 +4,7 @@ class NoFreeSlotsAvailable(Exception):
 
 class IgnoreRequest(Exception):
     pass
+
+
+class NotSupported(Exception):
+    pass

@@ -1,46 +1,35 @@
 from __future__ import unicode_literals, print_function, absolute_import
 
-import eventlet
-from functools import partial
 from lazy_object_proxy import Proxy as lazyProxy
 
 from nameko.extensions import ProviderCollector, SharedExtension
-from scrapel.constants import (
-    MIDDLEWARE_DOWNLOADER_REQUEST_METHOD,
-    MIDDLEWARE_DOWNLOADER_RESPONSE_METHOD,
-    MIDDLEWARE_DOWNLOADER_EXCEPTION_METHOD,
-    MIDDLEWARE_SPIDER_INPUT_METHOD,
-    MIDDLEWARE_SPIDER_OUTPUT_METHOD,
-    MIDDLEWARE_SPIDER_EXCEPTION_METHOD
-)
-from scrapel.exceptions import IgnoreRequest
-from scrapel.request import Request
-from scrapel.response import Response
-from scrapel.utils import get_callable, valid_providers, maybe_iterable
+from scrapel.constants import MIDDLEWARE_METHODS
+from scrapel.http.request import Request
+from scrapel.http.response import Response
+from scrapel.utils import maybe_iterable
 
 from .downloader import ScrapelDownloader
+from .spider import ScrapelSpider
 
 __author__ = 'Fill Q'
 __all__ = ['ScrapelEngine']
 
 
 class ScrapelEngine(ProviderCollector, SharedExtension):
+    def _valid_providers(self):
+        from scrapel.middleware.base import MiddlewareBase
+
+        return filter(
+            lambda p: (isinstance(p, MiddlewareBase)
+                       and getattr(p, 'method', None) in MIDDLEWARE_METHODS
+                       and isinstance(getattr(p, 'priority', None), int)),
+            maybe_iterable(self._providers)
+        )
+
     # Providers collection
     @property
     def providers(self):
-        return lazyProxy(partial(valid_providers, self._providers))
-
-    @property
-    def spider_input_providers(self):
-        return self._providers_by_method(MIDDLEWARE_SPIDER_INPUT_METHOD)
-
-    @property
-    def spider_output_providers(self):
-        return self._providers_by_method(MIDDLEWARE_SPIDER_OUTPUT_METHOD)
-
-    @property
-    def spider_exception_providers(self):
-        return self._providers_by_method(MIDDLEWARE_SPIDER_EXCEPTION_METHOD, reverse=True)
+        return lazyProxy(self._valid_providers)
 
     # Processing
     def process_request(self, request, worker, settings):
@@ -49,13 +38,9 @@ class ScrapelEngine(ProviderCollector, SharedExtension):
         gt.link(self.enqueue, worker=worker)
 
     def process_response(self, response, worker, settings):
-        request = response.request
-        for spm in self.spider_middlewares:
-            _callback = get_callable(spm, 'process')
-            if _callback is None:
-                continue
-            gt = worker.spawn(_callback, response=response, request=request, worker=worker, settings=settings)
-            gt.link(self.post_process, worker=worker)
+        spider = ScrapelSpider(worker=worker, engine=self)
+        gt = worker.spawn(spider.process_input, response=response, settings=settings)
+        gt.link(self.enqueue, worker=worker)
 
     def process_item(self, item, settings):
         pass

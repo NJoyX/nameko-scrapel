@@ -1,13 +1,13 @@
 from __future__ import unicode_literals, print_function, absolute_import
 
-from scrapel.request import Request
-from scrapel.response import Response
 from scrapel.constants import (
     MIDDLEWARE_DOWNLOADER_REQUEST_METHOD,
     MIDDLEWARE_DOWNLOADER_RESPONSE_METHOD,
     MIDDLEWARE_DOWNLOADER_EXCEPTION_METHOD
 )
 from scrapel.exceptions import IgnoreRequest
+from scrapel.http.request import Request
+from scrapel.http.response import Response
 from scrapel.utils import get_callable
 
 from .mixin import ScrapelProvidersMixin
@@ -55,7 +55,7 @@ class ScrapelDownloader(ScrapelProvidersMixin):
             elif isinstance(result, IgnoreRequest):
                 return self.process_exception(request=request, exception=result, settings=settings)
 
-        return self.download(request=request)
+        return self.download(request=request, settings=settings)
 
     def process_response(self, request, response, settings, dispatch_uid=None):
         providers = self.response_providers
@@ -121,6 +121,12 @@ class ScrapelDownloader(ScrapelProvidersMixin):
                     dispatch_uid=provider.dispatch_uid
                 )
 
-    def download(self, request):
-        # @TODO implement
-        return Response()
+    def download(self, request, settings):
+        transport = self.worker.transport_cls(worker=self.worker, settings=settings)
+        try:
+            response = transport.make_response(request)
+        except (NotImplemented, NotImplementedError):
+            return
+        except Exception as exc:
+            return self.process_exception(request=request, exception=exc, settings=settings)
+        return self.process_response(request=request, response=response, settings=settings)

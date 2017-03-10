@@ -1,6 +1,7 @@
 from __future__ import unicode_literals, print_function, absolute_import
 
 import weakref
+import six
 from functools import partial
 
 from nameko.constants import DEFAULT_MAX_WORKERS, MAX_WORKERS_CONFIG_KEY
@@ -28,9 +29,11 @@ CONCURRENCY = int(DEFAULT_MAX_WORKERS / 2)
 
 
 class Scrapel(FunctionSetMixin, DependencyProvider):
-    def __init__(self, allowed_domains, concurrency=CONCURRENCY, transport=Urllib3Transport):
-        self.allowed_domains = allowed_domains
-        self.transport = transport if issubclass(transport, BaseTransport) else Urllib3Transport
+    def __init__(self, allowed_domains, concurrency=CONCURRENCY, transport_cls=Urllib3Transport):
+        assert isinstance(allowed_domains, (list, tuple)), 'Incorrect format of allowed_domains'
+        self.allowed_domains = filter(six.text_type, allowed_domains)
+        assert self.allowed_domains, 'Empty Allowed Domains list'
+        self.transport_cls = transport_cls if issubclass(transport_cls, BaseTransport) else Urllib3Transport
         self.concurrency = try_int(concurrency, default=concurrency)
         self.jobs = weakref.WeakValueDictionary()
 
@@ -51,7 +54,8 @@ class Scrapel(FunctionSetMixin, DependencyProvider):
         return ScrapelWorker(
             context=context,
             job_id=job_id,
-            transport=self.transport,
+            transport_cls=self.transport_cls,
+            allowed_domains=self.allowed_domains,
             **settings
         )
 

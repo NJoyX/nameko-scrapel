@@ -3,12 +3,11 @@ from __future__ import unicode_literals, print_function, absolute_import
 import eventlet
 from sortedcontainers import SortedSet
 
+from .constants import JOBID, ALLOWED_DOMAINS
 from .engine import ScrapelEngine
-from .constants import JOBID
-from .request import Request
-from .response import Response
+from .http.request import Request
+from .http.response import Response
 from .settings import Settings
-from .transport import Urllib3Transport
 from .utils import maybe_iterable, FunctionGetMixin
 
 __author__ = 'Fill Q'
@@ -20,13 +19,15 @@ DEFAULT_SET_LOAD = 10000
 class ScrapelWorker(FunctionGetMixin):
     engine = ScrapelEngine()
 
-    def __init__(self, context, job_id, transport=Urllib3Transport, **extra):
+    def __init__(self, context, job_id, allowed_domains, transport_cls, **extra):
         self.context = context
         self.jid = job_id
-        self.transport = transport
+        self.transport_cls = transport_cls
 
         self.settings = Settings()
         self.settings.setdefault(JOBID, self.jid)
+        self.settings.setdefault(ALLOWED_DOMAINS, allowed_domains)
+        self.settings.setdefault('PROCESS_UID', self.context.call_id)
         self.settings.update(extra)
         self.engine = self.engine.bind(self.container)
         self.event = eventlet.Event()
