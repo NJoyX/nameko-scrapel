@@ -57,4 +57,4 @@ class FunctionGetMixin(object):
 
     @property
     def service(self):
-        raise NotImplemented
+        raise NotImplementedError

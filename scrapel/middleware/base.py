@@ -53,13 +53,11 @@ class MiddlewareBase(Entrypoint):
         ])
 
     def process(self, worker, *args, **kwargs):
-        new_kwargs = kwargs.copy()
-        new_kwargs['worker'] = worker
         try:
-            self.check_signature(*args, **new_kwargs)
+            self.check_signature(args, kwargs)
             service_cls = self.container.service_cls
             fn = getattr(service_cls, self.method_name)
-            return worker.map(fn, worker.context.service, *args, **kwargs)
+            return fn(worker.context.service, *args, **kwargs)
         except IncorrectSignature:
             pass
         except Exception as exc:

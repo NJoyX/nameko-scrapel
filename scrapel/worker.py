@@ -22,7 +22,6 @@ class ScrapelWorker(FunctionGetMixin):
     def __init__(self, context, job_id, allowed_domains, transport_cls, **extra):
         self.context = context
         self.jid = job_id
-        self.transport_cls = transport_cls
 
         self.settings = Settings()
         self.settings.setdefault(JOBID, self.jid)
@@ -34,6 +33,7 @@ class ScrapelWorker(FunctionGetMixin):
         self.pool = eventlet.GreenPool()
         self.queue = eventlet.Queue()
         self.results = self.defaultset
+        self.transport = transport_cls(worker=self, settings=self.settings)
 
     @property
     def defaultset(self):

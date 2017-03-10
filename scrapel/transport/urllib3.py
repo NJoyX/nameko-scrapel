@@ -1,11 +1,5 @@
 from __future__ import unicode_literals, print_function, absolute_import
 
-import urllib3
-from lazy_object_proxy.utils import cached_property
-from w3lib.util import to_bytes
-
-from .base import BaseTransport
-
 try:
     import OpenSSL
 
@@ -23,10 +17,16 @@ try:
 except ImportError:
     SECURE = False
 
+import six
+import urllib3
+from scrapel.utils.python import memoizemethod_noargs
 from scrapel.http.responsetypes import responsetypes
+from urllib3.util import parse_url
+from w3lib.util import to_bytes
+
+from .base import BaseTransport
 
 __author__ = 'Fill Q'
-
 
 RETRY_POLICY = {
     'default': {'total': 3},
@@ -39,24 +39,18 @@ class Urllib3Transport(BaseTransport):
     cls = urllib3.PoolManager
     proxy_cls = urllib3.ProxyManager
 
-    def __init__(self, *args, **kwargs):
-        super(Urllib3Transport, self).__init__(*args, **kwargs)
-
-    def get(self, name, default=None):
-        return self.worker.config.get(name, self.settings.get(name.upper(), default))
-
-    def make_response(self, request):
-        _proxy = request.meta.get('proxy', self.get('proxy', ''))
+    @memoizemethod_noargs
+    def _http(self):
+        kwargs = self.collected_kwargs()
         cls = self.cls
-        if _proxy and _proxy.startswith('http'):
+        if 'proxy_url' in kwargs:
             cls = self.proxy_cls
         # @TODO Socks Proxy
+        return cls(**kwargs)
 
-        urlopen_kwargs = self.collected_kwargs
-        if SECURE:
-            urlopen_kwargs['cert_reqs'] = 'CERT_REQUIRED'
-            urlopen_kwargs['ca_certs'] = certifi.where()
-        http = cls(**urlopen_kwargs)
+    http = property(_http)
+
+    def make_response(self, request, settings):
         request_kwargs = {}
         if isinstance(request.body, dict) and request.method == 'POST':
             request_kwargs['fields'] = request.body
@@ -65,10 +59,10 @@ class Urllib3Transport(BaseTransport):
 
         # @TODO add Cookies
         headers = request.headers.to_unicode_dict()
-        result = http.request(request.method, url=request.url, headers=headers, **request_kwargs)
+        result = self.http.request(request.method, url=request.url, headers=headers, **request_kwargs)
         try:
             body = to_bytes(result.data.decode(request.encoding))
-        except Exception as exc:
+        except Exception:
             body = to_bytes(request.data)
 
         response_cls = responsetypes.from_args(
@@ -84,7 +78,7 @@ class Urllib3Transport(BaseTransport):
             request=request
         )
 
-    @cached_property
+    @memoizemethod_noargs
     def collected_kwargs(self):
         kwargs = {}
         retries = self.get('retries')
@@ -112,4 +106,18 @@ class Urllib3Transport(BaseTransport):
             kwargs['timeout'] = urllib3.Timeout(**timeout_kw)
 
         kwargs['num_pools'] = self.get('num_pools', 10)
+        kwargs['block'] = True
+
+        if SECURE:
+            kwargs['cert_reqs'] = 'CERT_REQUIRED'
+            kwargs['ca_certs'] = certifi.where()
+
+        proxy_url = self.get('proxy', '')
+        if isinstance(proxy_url, (six.text_type, six.binary_type) + six.string_types) and proxy_url.startswith('http'):
+            auth = parse_url(proxy_url).auth
+            kwargs['proxy_url'] = proxy_url
+            kwargs['proxy_headers'] = urllib3.make_headers(proxy_basic_auth=auth) if auth else None
         return kwargs
+
+    def get(self, name, default=None):
+        return self.worker.config.get(name, self.settings.get(name.upper(), default))

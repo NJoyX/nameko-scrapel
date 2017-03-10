@@ -10,7 +10,7 @@ import parsel
 import six
 from parsel import Selector
 from scrapel.http import Response
-from scrapel.utils.misc import memoizemethod_noargs
+from scrapel.utils.python import memoizemethod_noargs
 from six.moves.urllib.parse import urljoin
 from w3lib import html
 from w3lib.encoding import html_to_unicode, resolve_encoding, \

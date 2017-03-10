@@ -9,7 +9,7 @@ import lxml.html
 import six
 from parsel.selector import create_root_node
 from scrapel.http.request import Request
-from scrapel.utils.misc import is_listlike
+from scrapel.utils.python import is_listlike
 from six.moves.urllib.parse import urljoin, urlencode
 from w3lib.html import strip_html5_whitespace, get_base_url
 from w3lib.util import to_bytes

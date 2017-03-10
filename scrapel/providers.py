@@ -63,7 +63,7 @@ class Scrapel(FunctionSetMixin, DependencyProvider):
         SpawningProxy([self.jobs.pop(job_id, FakeWorker())]).stop()
 
     def start_worker(self, context, job_id=None, **settings):
-        job_id = job_id or context.call_id
+        job_id = six.text_type(job_id or context.call_id)
 
         if job_id in self.jobs:
             return job_id

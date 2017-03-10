@@ -17,9 +17,14 @@ __all__ = ['ScrapelDownloader']
 
 
 class ScrapelDownloader(ScrapelProvidersMixin):
-    def __init__(self, worker, engine):
+    def __init__(self, worker, engine, settings):
         self.worker = worker
         self.engine = engine
+        self.settings = settings
+
+    @property
+    def transport(self):
+        return self.worker.transport
 
     @property
     def providers(self):
@@ -37,13 +42,13 @@ class ScrapelDownloader(ScrapelProvidersMixin):
     def exception_providers(self):
         return self._providers_by_method(MIDDLEWARE_DOWNLOADER_EXCEPTION_METHOD, reverse=True)
 
-    def process_request(self, request, settings):
+    def process_request(self, request):
         for provider in self.request_providers:
             _callback = get_callable(provider, 'process')
             if _callback is None:
                 continue
 
-            gt = self.worker.spawn(_callback, request=request, worker=self.worker, settings=settings)
+            gt = self.worker.spawn(_callback, request=request, worker=self.worker, settings=self.settings)
             gt.link(self.filter_result, classes=(type(None), Response, Request, IgnoreRequest))
             gt.link(self.pre_process_one)
 
@@ -51,13 +56,13 @@ class ScrapelDownloader(ScrapelProvidersMixin):
             if isinstance(result, Request):
                 return result
             elif isinstance(result, Response):
-                return self.process_response(request=request, response=result, settings=settings)
+                return self.process_response(request=request, response=result)
             elif isinstance(result, IgnoreRequest):
-                return self.process_exception(request=request, exception=result, settings=settings)
+                return self.process_exception(request=request, exception=result)
 
-        return self.download(request=request, settings=settings)
+        return self.download(request=request)
 
-    def process_response(self, request, response, settings, dispatch_uid=None):
+    def process_response(self, request, response, dispatch_uid=None):
         providers = self.response_providers
         if dispatch_uid:
             providers = (self.filter_by_dispatch_uid(providers, dispatch_uid=dispatch_uid) +
@@ -74,7 +79,7 @@ class ScrapelDownloader(ScrapelProvidersMixin):
                 request=request,
                 response=_response,
                 worker=self.worker,
-                settings=settings
+                settings=self.settings
             )
             gt.link(self.filter_result, classes=(Response, Request, IgnoreRequest))
             gt.link(self.pre_process_one)
@@ -94,7 +99,7 @@ class ScrapelDownloader(ScrapelProvidersMixin):
 
         return _response
 
-    def process_exception(self, request, exception, settings):
+    def process_exception(self, request, exception):
         for provider in self.exception_providers:
             _callback = get_callable(provider, 'process')
             if _callback is None:
@@ -105,7 +110,7 @@ class ScrapelDownloader(ScrapelProvidersMixin):
                 request=request,
                 exception=exception,
                 worker=self.worker,
-                settings=settings
+                settings=self.settings
             )
             gt.link(self.filter_result, classes=(type(None), Response, Request))
             gt.link(self.pre_process_one)
@@ -117,16 +122,14 @@ class ScrapelDownloader(ScrapelProvidersMixin):
                 return self.process_response(
                     request=request,
                     response=result,
-                    settings=settings,
                     dispatch_uid=provider.dispatch_uid
                 )
 
-    def download(self, request, settings):
-        transport = self.worker.transport_cls(worker=self.worker, settings=settings)
+    def download(self, request):
         try:
-            response = transport.make_response(request)
+            response = self.transport.make_response(request, settings=self.settings)
         except (NotImplemented, NotImplementedError):
             return
         except Exception as exc:
-            return self.process_exception(request=request, exception=exc, settings=settings)
-        return self.process_response(request=request, response=response, settings=settings)
+            return self.process_exception(request=request, exception=exc)
+        return self.process_response(request=request, response=response)

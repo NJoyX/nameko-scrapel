@@ -12,9 +12,10 @@ __all__ = ['ScrapelSpider']
 
 
 class ScrapelSpider(ScrapelProvidersMixin):
-    def __init__(self, worker, engine):
+    def __init__(self, worker, engine, settings):
         self.worker = worker
         self.engine = engine
+        self.settings = settings
 
     @property
     def providers(self):
@@ -32,11 +33,11 @@ class ScrapelSpider(ScrapelProvidersMixin):
     def spider_exception_providers(self):
         return self._providers_by_method(MIDDLEWARE_SPIDER_EXCEPTION_METHOD, reverse=True)
 
-    def process_input(self, response, settings):
+    def process_input(self, response):
         pass
 
-    def process_output(self, response, result, settings):
+    def process_output(self, response, result):
         pass
 
-    def process_exception(self, response, exception, settings):
+    def process_exception(self, response, exception):
         pass

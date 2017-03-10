@@ -33,13 +33,13 @@ class ScrapelEngine(ProviderCollector, SharedExtension):
 
     # Processing
     def process_request(self, request, worker, settings):
-        downloader = ScrapelDownloader(worker=worker, engine=self)
-        gt = worker.spawn(downloader.process_request, request=request, settings=settings)
+        downloader = ScrapelDownloader(worker=worker, engine=self, settings=settings)
+        gt = worker.spawn(downloader.process_request, request=request)
         gt.link(self.enqueue, worker=worker)
 
     def process_response(self, response, worker, settings):
-        spider = ScrapelSpider(worker=worker, engine=self)
-        gt = worker.spawn(spider.process_input, response=response, settings=settings)
+        spider = ScrapelSpider(worker=worker, engine=self, settings=settings)
+        gt = worker.spawn(spider.process_input, response=response)
         gt.link(self.enqueue, worker=worker)
 
     def process_item(self, item, settings):

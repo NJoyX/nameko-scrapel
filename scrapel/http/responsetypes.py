@@ -9,7 +9,7 @@ from io import StringIO
 import six
 
 from scrapel.http import Response, HtmlResponse, TextResponse, XmlResponse
-from scrapel.utils.misc import binary_is_text
+from scrapel.utils.python import binary_is_text
 from w3lib.util import to_native_str, to_bytes
 
 
