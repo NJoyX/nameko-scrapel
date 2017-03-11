@@ -3,5 +3,5 @@ class BaseTransport(object):
         self.worker = worker
         self.settings = settings
 
-    def make_response(self, request, settings):
+    def make_response(self, request):
         raise NotImplementedError

@@ -17,8 +17,14 @@ try:
 except ImportError:
     SECURE = False
 
+try:
+    from urllib3.contrib.socks import SOCKSProxyManager
+except ImportError:
+    SOCKSProxyManager = None
+
 import six
 import urllib3
+import weakref
 from scrapel.utils.python import memoizemethod_noargs
 from scrapel.http.responsetypes import responsetypes
 from urllib3.util import parse_url
@@ -36,21 +42,37 @@ RETRY_POLICY = {
 
 
 class Urllib3Transport(BaseTransport):
-    cls = urllib3.PoolManager
-    proxy_cls = urllib3.ProxyManager
+    pool_type = {
+        None: urllib3.PoolManager,
+        'proxy': urllib3.ProxyManager,
+        'socks': SOCKSProxyManager or urllib3.PoolManager
+    }
 
-    @memoizemethod_noargs
-    def _http(self):
+    def __init__(self, *args, **kwargs):
+        super(Urllib3Transport, self).__init__(*args, **kwargs)
+        self.pool = weakref.WeakValueDictionary()
+
+    proxy = property(lambda self: self.get('proxy'))
+    is_proxy = property(lambda self: (
+        isinstance(self.proxy, (six.text_type, six.binary_type) + six.string_types)
+        and (self.proxy.startswith('http') or self.proxy.startswith('socks'))
+    ))
+
+    @property
+    def http(self):
+        pooled = self.pool.get(self.proxy)
+        if pooled:
+            return pooled
+
         kwargs = self.collected_kwargs()
-        cls = self.cls
-        if 'proxy_url' in kwargs:
-            cls = self.proxy_cls
-        # @TODO Socks Proxy
-        return cls(**kwargs)
+        _type = None
+        if self.is_proxy:
+            _type = 'proxy' if self.proxy.startswith('http') else 'socks'
+            kwargs['num_pools'] = 2
+        self.pool[self.proxy] = instance = self.pool_type.get(_type)(**kwargs)
+        return instance
 
-    http = property(_http)
-
-    def make_response(self, request, settings):
+    def make_response(self, request):
         request_kwargs = {}
         if isinstance(request.body, dict) and request.method == 'POST':
             request_kwargs['fields'] = request.body
@@ -112,11 +134,11 @@ class Urllib3Transport(BaseTransport):
             kwargs['cert_reqs'] = 'CERT_REQUIRED'
             kwargs['ca_certs'] = certifi.where()
 
-        proxy_url = self.get('proxy', '')
-        if isinstance(proxy_url, (six.text_type, six.binary_type) + six.string_types) and proxy_url.startswith('http'):
-            auth = parse_url(proxy_url).auth
-            kwargs['proxy_url'] = proxy_url
+        if self.is_proxy:
+            auth = parse_url(self.proxy).auth
+            kwargs['proxy_url'] = self.proxy
             kwargs['proxy_headers'] = urllib3.make_headers(proxy_basic_auth=auth) if auth else None
+
         return kwargs
 
     def get(self, name, default=None):

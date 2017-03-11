@@ -127,7 +127,7 @@ class ScrapelDownloader(ScrapelProvidersMixin):
 
     def download(self, request):
         try:
-            response = self.transport.make_response(request, settings=self.settings)
+            response = self.transport.make_response(request)
         except (NotImplemented, NotImplementedError):
             return
         except Exception as exc:
