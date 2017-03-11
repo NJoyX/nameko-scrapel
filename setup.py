@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
-extras_secure = ['pyOpenSSL>=0.14', 'cryptography>=1.3.4', 'idna>=2.0.0', 'certifi', "ipaddress"]
-extras_socks = ['PySocks>=1.5.6,<2.0,!=1.5.7']
+extras_secure = ["urllib3[secure]"]
+extras_socks = ["urllib3[socks]"]
 extras_all = extras_secure + extras_socks
 
 setup(

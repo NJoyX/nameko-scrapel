@@ -3,11 +3,12 @@ from __future__ import unicode_literals, print_function, absolute_import
 try:
     import OpenSSL
 
-    import urllib3.contrib.pyopenssl
+    from urllib3.contrib import pyopenssl
 
-    urllib3.contrib.pyopenssl.inject_into_urllib3()
+    pyopenssl.inject_into_urllib3()
 except ImportError:
-    pass
+    OpenSSL = None
+    pyopenssl = None
 
 try:
     import certifi
@@ -15,6 +16,8 @@ try:
 
     SECURE = True
 except ImportError:
+    certifi = None
+    cryptography = None
     SECURE = False
 
 try:
@@ -138,6 +141,16 @@ class Urllib3Transport(BaseTransport):
             auth = parse_url(self.proxy).auth
             kwargs['proxy_url'] = self.proxy
             kwargs['proxy_headers'] = urllib3.make_headers(proxy_basic_auth=auth) if auth else None
+            if self.proxy.startswith('socks'):
+                kwargs.pop('proxy_headers')
+                auth_splitted = auth.split(':')
+                kwargs['username'] = auth_splitted[0] if len(auth_splitted) > 0 else None
+                kwargs['password'] = auth_splitted[1] if len(auth_splitted) > 1 else None
+
+        if SOCKSProxyManager is None:
+            kwargs.pop('proxy_url', None)
+            kwargs.pop('username', None)
+            kwargs.pop('password', None)
 
         return kwargs
 

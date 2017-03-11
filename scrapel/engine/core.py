@@ -3,9 +3,8 @@ from __future__ import unicode_literals, print_function, absolute_import
 from lazy_object_proxy import Proxy as lazyProxy
 
 from nameko.extensions import ProviderCollector, SharedExtension
+from scrapel import Request, Response
 from scrapel.constants import MIDDLEWARE_METHODS
-from scrapel.http.request import Request
-from scrapel.http.response import Response
 from scrapel.utils import maybe_iterable
 
 from .downloader import ScrapelDownloader
