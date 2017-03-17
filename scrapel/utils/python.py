@@ -6,7 +6,7 @@ from functools import wraps
 from eventlet.support import six
 
 __author__ = 'Fill Q'
-__all__ = ['maybe_iterable', 'get_callable', 'try_int']
+__all__ = ['maybe_iterable', 'iter_iterable', 'get_callable', 'try_int']
 
 
 def maybe_iterable(items):
@@ -14,11 +14,24 @@ def maybe_iterable(items):
         items = [items]
     elif items is None:
         items = []
+    elif isinstance(items, dict):
+        items = [items]
     elif isinstance(items, (list, tuple)) or hasattr(items, '__iter__'):
         pass
     else:
         items = [items]
     return iter(items)
+
+
+def iter_iterable(items):
+    result = maybe_iterable(items)
+    while True:
+        try:
+            yield next(result)
+        except StopIteration:
+            break
+        except:
+            break
 
 
 def get_callable(obj, name):

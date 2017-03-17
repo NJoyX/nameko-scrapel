@@ -2,6 +2,7 @@ from __future__ import unicode_literals, print_function, absolute_import
 
 import weakref
 from functools import partial
+from .python import maybe_iterable
 
 __author__ = 'Fill Q'
 __all__ = ['FunctionGetMixin', 'FunctionSetMixin']
@@ -14,19 +15,23 @@ class FunctionRegistry(object):
     _start_requests = None
 
     def on_start(self, f):
-        self._on_start = weakref.ref(f)
+        if callable(f):
+            self._on_start = weakref.ref(f)
         return f
 
     def on_stop(self, f):
-        self._on_stop = weakref.ref(f)
+        if callable(f):
+            self._on_stop = weakref.ref(f)
         return f
 
     def pipeline(self, f):
-        self._pipeline.add(f)
+        if callable(f):
+            self._pipeline.add(f)
         return f
 
     def start_requests(self, f):
-        self._start_requests = weakref.ref(f)
+        if callable(f):
+            self._start_requests = weakref.ref(f)
         return f
 
 
@@ -52,8 +57,11 @@ class FunctionSetMixin(object):
 class FunctionGetMixin(object):
     on_start = property(lambda self: partial(_registry_getter.on_start, self.service))
     on_stop = property(lambda self: partial(_registry_getter.on_stop, self.service))
-    pipeline = property(lambda self: partial(_registry_getter.pipeline, self.service))
     start_requests = property(lambda self: partial(_registry_getter.start_requests, self.service))
+
+    @property
+    def pipeline(self):
+        return set(map(lambda p: partial(p, self.service), maybe_iterable(_registry_setter._pipeline)))
 
     @property
     def service(self):

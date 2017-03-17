@@ -2,13 +2,14 @@ from __future__ import unicode_literals, print_function, absolute_import
 
 import eventlet
 from sortedcontainers import SortedSet
+import collections
 
 from .constants import JOBID, ALLOWED_DOMAINS
 from .engine import ScrapelEngine
 from .http.request import Request
 from .http.response import Response
 from .settings import Settings
-from .utils import maybe_iterable, FunctionGetMixin
+from .utils import maybe_iterable, iter_iterable, FunctionGetMixin
 
 __author__ = 'Fill Q'
 __all__ = ['ScrapelWorker', 'FakeWorker']
@@ -18,6 +19,7 @@ DEFAULT_SET_LOAD = 10000
 
 class ScrapelWorker(FunctionGetMixin):
     engine = ScrapelEngine()
+    ScrapelItems = (dict, collections.Mapping)
 
     def __init__(self, context, job_id, allowed_domains, transport_cls, **extra):
         self.context = context
@@ -106,20 +108,31 @@ class ScrapelWorker(FunctionGetMixin):
 
     def process(self, items):
         results = []
-        for item in maybe_iterable(items):
-            result = None
+        for item in iter_iterable(items):
             if isinstance(item, Request):
                 self.engine.process_request(request=item, worker=self, settings=self.settings)
             elif isinstance(item, Response):
                 self.engine.process_response(response=item, worker=self, settings=self.settings)
-            # @TODO implement for pipeline
-            # elif isinstance(item, ScrapelItem):
-            #     result = self.spawn(self.engine.process_item, item=item, settings=self.settings)
-            results.extend(maybe_iterable(result))
+            elif isinstance(item, self.ScrapelItems):
+                result = self.engine.process_item(item=item, worker=self, settings=self.settings)
+                results.extend(maybe_iterable(result))
         return filter(None, results)
 
     def update_results(self, gt):
-        self.results.update(filter(None, maybe_iterable(gt.wait())))
+        for result in iter_iterable(gt.wait()):
+            if result is None:
+                continue
+
+            if isinstance(result, (dict, collections.Mapping)):
+                nt = collections.namedtuple('Result', result.keys())
+                result = nt(**result)
+            try:
+                hash(result)
+            except TypeError:
+                continue
+
+            # update it finally
+            self.results.update(result)
 
 
 class FakeWorker(FunctionGetMixin):

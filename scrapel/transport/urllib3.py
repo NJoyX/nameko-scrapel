@@ -47,15 +47,18 @@ RETRY_POLICY = {
 class Urllib3Transport(BaseTransport):
     pool_type = {
         None: urllib3.PoolManager,
-        'proxy': urllib3.ProxyManager,
-        'socks': SOCKSProxyManager or urllib3.PoolManager
+        'http': urllib3.ProxyManager,
+        'https': urllib3.ProxyManager,
+        'socks': SOCKSProxyManager or urllib3.PoolManager,
+        'socks4': SOCKSProxyManager or urllib3.PoolManager,
+        'socks5': SOCKSProxyManager or urllib3.PoolManager
     }
 
     def __init__(self, *args, **kwargs):
         super(Urllib3Transport, self).__init__(*args, **kwargs)
         self.pool = weakref.WeakValueDictionary()
 
-    proxy = property(lambda self: self.get('proxy'))
+    proxy = property(lambda self: self.get('proxy') or '')
     is_proxy = property(lambda self: (
         isinstance(self.proxy, (six.text_type, six.binary_type) + six.string_types)
         and (self.proxy.startswith('http') or self.proxy.startswith('socks'))
@@ -68,11 +71,10 @@ class Urllib3Transport(BaseTransport):
             return pooled
 
         kwargs = self.collected_kwargs()
-        _type = None
+        _type = parse_url(self.proxy).scheme
         if self.is_proxy:
-            _type = 'proxy' if self.proxy.startswith('http') else 'socks'
             kwargs['num_pools'] = 2
-        self.pool[self.proxy] = instance = self.pool_type.get(_type)(**kwargs)
+        self.pool[self.proxy] = instance = self.pool_type.get(_type, urllib3.PoolManager)(**kwargs)
         return instance
 
     def make_response(self, request):
@@ -137,17 +139,17 @@ class Urllib3Transport(BaseTransport):
             kwargs['cert_reqs'] = 'CERT_REQUIRED'
             kwargs['ca_certs'] = certifi.where()
 
+        is_socks_proxy = self.proxy.startswith('socks')
         if self.is_proxy:
-            auth = parse_url(self.proxy).auth
+            auth = parse_url(self.proxy).auth or ''
             kwargs['proxy_url'] = self.proxy
             kwargs['proxy_headers'] = urllib3.make_headers(proxy_basic_auth=auth) if auth else None
-            if self.proxy.startswith('socks'):
+            if is_socks_proxy:
                 kwargs.pop('proxy_headers')
-                auth_splitted = auth.split(':')
-                kwargs['username'] = auth_splitted[0] if len(auth_splitted) > 0 else None
-                kwargs['password'] = auth_splitted[1] if len(auth_splitted) > 1 else None
+                auth_splitted = filter(None, auth.split(':'))
+                kwargs['username'], kwargs['password'] = auth_splitted + [None] * (2 - len(auth_splitted))
 
-        if SOCKSProxyManager is None:
+        if SOCKSProxyManager is None and is_socks_proxy:
             kwargs.pop('proxy_url', None)
             kwargs.pop('username', None)
             kwargs.pop('password', None)

@@ -4,4 +4,4 @@ __author__ = 'Scrapy developers'
 
 
 class HtmlResponse(TextResponse):
-    pass
+    type = 'html'

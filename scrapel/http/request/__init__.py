@@ -11,7 +11,7 @@ __all__ = ['Request']
 
 
 class Request(object):
-    def __init__(self, url, callback=None, method='GET', headers=None, body=None,
+    def __init__(self, url, callback, method='GET', headers=None, body=None,
                  cookies=None, meta=None, encoding='utf-8', priority=0,
                  dont_filter=False, errback=None):
 

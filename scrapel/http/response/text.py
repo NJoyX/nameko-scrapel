@@ -114,7 +114,12 @@ class TextResponse(Response):
     @property
     def selector(self):
         if self._cached_selector is None:
-            self._cached_selector = Selector(self)
+            self._cached_selector = Selector(
+                self.text,
+                type=self.type,
+                namespaces={'re': 'http://exslt.org/regular-expressions	'},
+                base_url=self.request.url
+            )
         return self._cached_selector
 
     def xpath(self, query, **kwargs):

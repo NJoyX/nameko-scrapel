@@ -2,10 +2,12 @@ from __future__ import unicode_literals, print_function, absolute_import
 
 from lazy_object_proxy import Proxy as lazyProxy
 
+import eventlet
 from nameko.extensions import ProviderCollector, SharedExtension
 from scrapel import Request, Response
 from scrapel.constants import MIDDLEWARE_METHODS
-from scrapel.utils import maybe_iterable
+from scrapel.exceptions import ItemDropped
+from scrapel.utils import maybe_iterable, iter_iterable
 
 from .downloader import ScrapelDownloader
 from .spider import ScrapelSpider
@@ -41,17 +43,30 @@ class ScrapelEngine(ProviderCollector, SharedExtension):
         gt = worker.spawn(spider.process_input, response=response)
         gt.link(self.enqueue, worker=worker)
 
-    def process_item(self, item, settings):
-        pass
+    def process_item(self, item, worker, settings):
+        for pipeline in worker.pipeline:
+            print(pipeline(item=item, settings=settings))
+            result = None
+            try:
+                result = pipeline(item=item, settings=settings)
+            except ItemDropped:
+                pass
+            except Exception as exc:
+                event = eventlet.Event()
+                worker.spawn(self.enqueue, event, worker=worker)
+                event.send(exc)
+            item = result if isinstance(result, type(item)) else item
+        return item
 
     @staticmethod
     def enqueue(gt, worker):
         try:
-            result = gt.wait()
+            results = gt.wait()
         except Exception as exc:
-            result = exc
+            results = exc
 
-        if isinstance(result, (Request, Response)):  # , Item)):
-            worker.queue.put(result)
-        elif isinstance(result, Exception):
-            print(result)
+        for result in iter_iterable(results):
+            if isinstance(result, (Request, Response, worker.ScrapelItems)):
+                worker.queue.put([result])
+            elif isinstance(result, Exception):
+                print(result)

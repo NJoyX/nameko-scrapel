@@ -60,7 +60,9 @@ class ScrapelDownloader(ScrapelProvidersMixin):
             elif isinstance(result, IgnoreRequest):
                 return self.process_exception(request=request, exception=result)
 
-        return self.download(request=request)
+        gt2 = self.worker.spawn(self.download, request=request)
+        gt2.link(self.pre_process_many)
+        return gt2.wait()
 
     def process_response(self, request, response, dispatch_uid=None):
         providers = self.response_providers

@@ -13,6 +13,8 @@ __all__ = ['Response']
 
 
 class Response(object):
+    type = None
+
     def __init__(self, url, status=200, headers=None, body=b'', request=None):
         self.headers = Headers(headers or {})
         self.status = int(status)

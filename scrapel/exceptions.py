@@ -8,3 +8,7 @@ class IgnoreRequest(Exception):
 
 class NotSupported(Exception):
     pass
+
+
+class ItemDropped(Exception):
+    pass

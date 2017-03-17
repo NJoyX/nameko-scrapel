@@ -34,7 +34,11 @@ class ScrapelProvidersMixin(object):
     # Process Helpers
     @staticmethod
     def pre_process_one(gt):
-        return maybe_iterable(gt.wait()).next()
+        try:
+            return maybe_iterable(gt.wait()).next()
+        except StopIteration:
+            pass
+        return
 
     @staticmethod
     def pre_process_many(gt):
