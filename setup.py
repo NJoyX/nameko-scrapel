@@ -6,7 +6,7 @@ extras_all = extras_secure + extras_socks
 
 setup(
     name='nameko-scrapel',
-    version='0.1-alpha',
+    version='0.1-rc',
     description='@TODO',
     long_description='@TODO',
     author='Fill Q',

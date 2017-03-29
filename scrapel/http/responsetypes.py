@@ -3,18 +3,20 @@ This module implements a class which returns the appropriate Response class
 based on different criteria.
 """
 from __future__ import absolute_import
+
+from io import StringIO
 from mimetypes import MimeTypes
 from pkgutil import get_data
-from io import StringIO
-import six
 
+import six
 from scrapel.http import Response, HtmlResponse, TextResponse, XmlResponse
 from scrapel.utils.python import binary_is_text
 from w3lib.util import to_native_str, to_bytes
 
+__author__ = 'Fill Q and Scrapy developers'
+
 
 class ResponseTypes(object):
-
     CLASSES = {
         'text/html': HtmlResponse,
         'application/atom+xml': XmlResponse,
@@ -61,7 +63,7 @@ class ResponseTypes(object):
     def from_content_disposition(self, content_disposition):
         try:
             filename = to_native_str(content_disposition,
-                encoding='latin-1', errors='replace').split(';')[1].split('=')[1]
+                                     encoding='latin-1', errors='replace').split(';')[1].split('=')[1]
             filename = filename.strip('"\'')
             return self.from_filename(filename)
         except IndexError:
@@ -124,5 +126,6 @@ class ResponseTypes(object):
 
     def guess_response(self, headers=None, url=None, filename=None, body=None):
         return self.from_args(headers, url, filename, body)
+
 
 responsetypes = ResponseTypes()

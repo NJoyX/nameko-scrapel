@@ -3,6 +3,7 @@ from __future__ import unicode_literals, print_function, absolute_import
 import eventlet
 from sortedcontainers import SortedSet
 import collections
+from lazy_object_proxy import Proxy as lazyProxy
 
 from .constants import JOBID, ALLOWED_DOMAINS
 from .engine import ScrapelEngine
@@ -35,7 +36,7 @@ class ScrapelWorker(FunctionGetMixin):
         self.pool = eventlet.GreenPool()
         self.queue = eventlet.Queue()
         self.results = self.defaultset
-        self.transport = transport_cls(worker=self, settings=self.settings)
+        self.transport = transport_cls(worker=self, settings=lazyProxy(self.settings))
 
     @property
     def defaultset(self):
@@ -88,7 +89,7 @@ class ScrapelWorker(FunctionGetMixin):
         _map.spawn(fn, *args, **kwargs)
         return maybe_iterable(_map)
 
-    def run(self, gt):
+    def run(self, gt, *args, **kwargs):
         self.queue.put(self.pile(self.start_requests, jid=self.jid))
 
         while True:
@@ -123,7 +124,7 @@ class ScrapelWorker(FunctionGetMixin):
             if result is None:
                 continue
 
-            if isinstance(result, (dict, collections.Mapping)):
+            if isinstance(result, self.ScrapelItems):
                 nt = collections.namedtuple('Result', result.keys())
                 result = nt(**result)
             try:

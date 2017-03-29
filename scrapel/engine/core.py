@@ -8,6 +8,7 @@ from scrapel import Request, Response
 from scrapel.constants import MIDDLEWARE_METHODS
 from scrapel.exceptions import ItemDropped
 from scrapel.utils import maybe_iterable, iter_iterable
+from werkzeug.utils import cached_property
 
 from .downloader import ScrapelDownloader
 from .spider import ScrapelSpider
@@ -17,20 +18,22 @@ __all__ = ['ScrapelEngine']
 
 
 class ScrapelEngine(ProviderCollector, SharedExtension):
+    @cached_property
     def _valid_providers(self):
         from scrapel.middleware.base import MiddlewareBase
 
         return filter(
             lambda p: (isinstance(p, MiddlewareBase)
                        and getattr(p, 'method', None) in MIDDLEWARE_METHODS
-                       and isinstance(getattr(p, 'priority', None), int)),
+                       and isinstance(getattr(p, 'priority', None), int)
+                       and getattr(p, 'enabled', False)),
             maybe_iterable(self._providers)
         )
 
     # Providers collection
     @property
     def providers(self):
-        return lazyProxy(self._valid_providers)
+        return lazyProxy(lambda: self._valid_providers)
 
     # Processing
     def process_request(self, request, worker, settings):

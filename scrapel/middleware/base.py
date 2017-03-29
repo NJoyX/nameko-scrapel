@@ -30,6 +30,7 @@ class MiddlewareBase(Entrypoint):
     priority = 9999
     method = None
     dispatch_uid = None
+    enabled = True
 
     def start(self):
         if self.dispatch_uid is None:
@@ -40,10 +41,11 @@ class MiddlewareBase(Entrypoint):
         self.collector.unregister_provider(self)
         super(MiddlewareBase, self).stop()
 
-    def __init__(self, priority=None, dispatch_uid=None):
+    def __init__(self, priority=None, enabled=None, dispatch_uid=None):
         self.priority = priority or self.priority
         assert self.method in MIDDLEWARE_METHODS, 'Use only predefined methods'
         self.dispatch_uid = dispatch_uid
+        self.enabled = enabled or self.enabled
 
     @property
     def _default_dispatch_uid(self):

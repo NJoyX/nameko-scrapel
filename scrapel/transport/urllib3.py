@@ -66,9 +66,8 @@ class Urllib3Transport(BaseTransport):
 
     @property
     def http(self):
-        pooled = self.pool.get(self.proxy)
-        if pooled:
-            return pooled
+        if self.proxy in self.pool:
+            return self.pool.get(self.proxy)
 
         kwargs = self.collected_kwargs()
         _type = parse_url(self.proxy).scheme
@@ -84,7 +83,6 @@ class Urllib3Transport(BaseTransport):
         else:
             request_kwargs['body'] = request.body
 
-        # @TODO add Cookies
         headers = request.headers.to_unicode_dict()
         result = self.http.request(request.method, url=request.url, headers=headers, **request_kwargs)
         try:
@@ -142,7 +140,7 @@ class Urllib3Transport(BaseTransport):
         is_socks_proxy = self.proxy.startswith('socks')
         if self.is_proxy:
             auth = parse_url(self.proxy).auth or ''
-            kwargs['proxy_url'] = self.proxy
+            kwargs['proxy_url'] = self._build_parsed(parse_url(self.proxy))
             kwargs['proxy_headers'] = urllib3.make_headers(proxy_basic_auth=auth) if auth else None
             if is_socks_proxy:
                 kwargs.pop('proxy_headers')
@@ -155,6 +153,22 @@ class Urllib3Transport(BaseTransport):
             kwargs.pop('password', None)
 
         return kwargs
+
+    @staticmethod
+    def _build_parsed(parsed, auth=False):
+        dc = parsed._asdict()
+        path = '{scheme}://'
+        if dc.get('auth') is not None and auth:
+            path += '{auth}@'
+        path += '{host}'
+        if dc.get('port') is not None:
+            path += ':{port}'
+        path += '{path}'
+        if dc.get('query') is not None:
+            path += '?{query}'
+        if dc.get('fragment') is not None:
+            path += '#{fragment}'
+        return path.format(**dc)
 
     def get(self, name, default=None):
         return self.worker.config.get(name, self.settings.get(name.upper(), default))

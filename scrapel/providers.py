@@ -1,22 +1,21 @@
 from __future__ import unicode_literals, print_function, absolute_import
 
 import weakref
-import six
 from functools import partial
 
-from nameko.constants import DEFAULT_MAX_WORKERS, MAX_WORKERS_CONFIG_KEY
+import six
 from nameko.extensions import DependencyProvider
 from nameko.utils import SpawningProxy
 
 from .constants import JOBID
 from .exceptions import NoFreeSlotsAvailable
-from .middleware import (
-    DownloaderRequestMiddleware,
-    DownloaderResponseMiddleware,
-    DownloaderExceptionMiddleware,
-    SpiderInputMiddleware,
-    SpiderOutputMiddleware,
-    SpiderExceptionMiddleware
+from .decorators import (
+    request_middleware,
+    response_middleware,
+    exception_middleware,
+    spider_input_middleware,
+    spider_output_middleware,
+    spider_exception_middleware
 )
 from .settings import Settings
 from .transport import BaseTransport, Urllib3Transport
@@ -25,21 +24,18 @@ from .worker import ScrapelWorker, FakeWorker
 
 __author__ = 'Fill Q'
 
-CONCURRENCY = int(DEFAULT_MAX_WORKERS / 2)
+
+DEFAULT_MAX_WORKERS = 30
 
 
 class Scrapel(FunctionSetMixin, DependencyProvider):
-    def __init__(self, allowed_domains, concurrency=CONCURRENCY, transport_cls=Urllib3Transport):
+    def __init__(self, allowed_domains, concurrency=None, transport_cls=Urllib3Transport):
         assert isinstance(allowed_domains, (list, tuple)), 'Incorrect format of allowed_domains'
         self.allowed_domains = filter(six.text_type, allowed_domains)
         assert self.allowed_domains, 'Empty Allowed Domains list'
         self.transport_cls = transport_cls if issubclass(transport_cls, BaseTransport) else Urllib3Transport
-        self.concurrency = try_int(concurrency, default=concurrency)
+        self.concurrency = try_int(concurrency, default=DEFAULT_MAX_WORKERS)
         self.jobs = weakref.WeakValueDictionary()
-
-    def setup(self):
-        if self.concurrency is None:
-            self.concurrency = try_int(self.container.config.get(MAX_WORKERS_CONFIG_KEY, DEFAULT_MAX_WORKERS))
 
     def get_dependency(self, worker_ctx):
         return type(str('Scrapel'), (), dict(
@@ -106,9 +102,9 @@ class Scrapel(FunctionSetMixin, DependencyProvider):
         return super(Scrapel, self).kill()
 
     # Entrypoints
-    request_middleware = DownloaderRequestMiddleware.decorator
-    response_middleware = DownloaderResponseMiddleware.decorator
-    exception_middleware = DownloaderExceptionMiddleware.decorator
-    spider_input_middleware = SpiderInputMiddleware.decorator
-    spider_output_middleware = SpiderOutputMiddleware.decorator
-    spider_exception_middleware = SpiderExceptionMiddleware.decorator
+    request_middleware = request_middleware
+    response_middleware = response_middleware
+    exception_middleware = exception_middleware
+    spider_input_middleware = spider_input_middleware
+    spider_output_middleware = spider_output_middleware
+    spider_exception_middleware = spider_exception_middleware

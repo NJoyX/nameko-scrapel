@@ -1,7 +1,9 @@
 import six
 from scrapel.utils.datatypes import CaselessDict
-from w3lib.util import to_unicode
 from w3lib.http import headers_dict_to_raw
+from w3lib.util import to_unicode
+
+__author__ = 'Fill Q and Scrapy developers'
 
 
 class Headers(CaselessDict):
