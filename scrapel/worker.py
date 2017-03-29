@@ -36,7 +36,7 @@ class ScrapelWorker(FunctionGetMixin):
         self.pool = eventlet.GreenPool()
         self.queue = eventlet.Queue()
         self.results = self.defaultset
-        self.transport = transport_cls(worker=self, settings=lazyProxy(self.settings))
+        self.transport = transport_cls(worker=self, settings=lazyProxy(lambda: self.settings))
 
     @property
     def defaultset(self):
