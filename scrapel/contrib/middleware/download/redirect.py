@@ -1,7 +1,7 @@
 from __future__ import unicode_literals, print_function, absolute_import
 
 from scrapel import HtmlResponse
-from scrapel.contrib.middleware.decorators import response_middleware
+from scrapel.decorators import response_middleware
 from scrapel.exceptions import IgnoreRequest
 from six.moves.urllib.parse import urljoin
 from w3lib.html import get_meta_refresh

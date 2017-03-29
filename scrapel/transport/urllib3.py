@@ -7,17 +7,16 @@ try:
 
     pyopenssl.inject_into_urllib3()
 except ImportError:
-    OpenSSL = None
-    pyopenssl = None
+    OpenSSL = pyopenssl = None
 
 try:
     import certifi
     import cryptography
+    from ssl import CERT_REQUIRED
 
     SECURE = True
 except ImportError:
-    certifi = None
-    cryptography = None
+    certifi = cryptography = CERT_REQUIRED = None
     SECURE = False
 
 try:
@@ -134,7 +133,7 @@ class Urllib3Transport(BaseTransport):
         kwargs['block'] = True
 
         if SECURE:
-            kwargs['cert_reqs'] = 'CERT_REQUIRED'
+            kwargs['cert_reqs'] = CERT_REQUIRED
             kwargs['ca_certs'] = certifi.where()
 
         is_socks_proxy = self.proxy.startswith('socks')

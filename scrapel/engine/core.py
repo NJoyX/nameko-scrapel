@@ -1,14 +1,12 @@
 from __future__ import unicode_literals, print_function, absolute_import
 
-from lazy_object_proxy import Proxy as lazyProxy
-
 import eventlet
+from lazy_object_proxy import Proxy as lazyProxy
 from nameko.extensions import ProviderCollector, SharedExtension
 from scrapel import Request, Response
 from scrapel.constants import MIDDLEWARE_METHODS
 from scrapel.exceptions import ItemDropped
 from scrapel.utils import maybe_iterable, iter_iterable
-from werkzeug.utils import cached_property
 
 from .downloader import ScrapelDownloader
 from .spider import ScrapelSpider
@@ -18,7 +16,6 @@ __all__ = ['ScrapelEngine']
 
 
 class ScrapelEngine(ProviderCollector, SharedExtension):
-    @cached_property
     def _valid_providers(self):
         from scrapel.middleware.base import MiddlewareBase
 
@@ -33,7 +30,7 @@ class ScrapelEngine(ProviderCollector, SharedExtension):
     # Providers collection
     @property
     def providers(self):
-        return lazyProxy(lambda: self._valid_providers)
+        return lazyProxy(self._valid_providers)
 
     # Processing
     def process_request(self, request, worker, settings):
@@ -48,7 +45,6 @@ class ScrapelEngine(ProviderCollector, SharedExtension):
 
     def process_item(self, item, worker, settings):
         for pipeline in worker.pipeline:
-            print(pipeline(item=item, settings=settings))
             result = None
             try:
                 result = pipeline(item=item, settings=settings)
