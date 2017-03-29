@@ -1,9 +1,11 @@
 from __future__ import unicode_literals, print_function, absolute_import
 
-import eventlet
-from sortedcontainers import SortedSet
 import collections
 from lazy_object_proxy import Proxy as lazyProxy
+
+import eventlet
+import types
+from sortedcontainers import SortedSet
 
 from .constants import JOBID, ALLOWED_DOMAINS
 from .engine import ScrapelEngine
@@ -15,7 +17,7 @@ from .utils import maybe_iterable, iter_iterable, FunctionGetMixin
 __author__ = 'Fill Q'
 __all__ = ['ScrapelWorker', 'FakeWorker']
 
-DEFAULT_SET_LOAD = 10000
+DEFAULT_SET_LOAD = 1000
 
 
 class ScrapelWorker(FunctionGetMixin):
@@ -65,8 +67,9 @@ class ScrapelWorker(FunctionGetMixin):
         if self.is_running:
             self.event.send(result)
 
-        self.map(self.on_stop, results=set(
-            self.event.wait() or self.defaultset | result | self.results
+        self.map(self.on_stop, results=SortedSet(
+            self.event.wait() or self.defaultset | result | self.results,
+            load=DEFAULT_SET_LOAD
         ), jid=self.jid)
         self.pool.waitall()
 
@@ -117,6 +120,8 @@ class ScrapelWorker(FunctionGetMixin):
             elif isinstance(item, self.ScrapelItems):
                 result = self.engine.process_item(item=item, worker=self, settings=self.settings)
                 results.extend(maybe_iterable(result))
+            elif isinstance(item, types.GeneratorType):
+                self.queue.put(item)
         return filter(None, results)
 
     def update_results(self, gt):
