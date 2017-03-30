@@ -17,10 +17,13 @@ logger = logging.getLogger(__name__)
 
 
 class ScrapelSpider(ScrapelProvidersMixin):
-    def __init__(self, worker, engine, settings):
+    def __init__(self, worker, engine):
         self.worker = worker
         self.engine = engine
-        self.settings = settings
+
+    @property
+    def settings(self):
+        return self.worker.settings
 
     @property
     def providers(self):

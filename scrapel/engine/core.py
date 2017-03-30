@@ -33,21 +33,21 @@ class ScrapelEngine(ProviderCollector, SharedExtension):
         return lazyProxy(self._valid_providers)
 
     # Processing
-    def process_request(self, request, worker, settings):
-        downloader = ScrapelDownloader(worker=worker, engine=self, settings=settings)
+    def process_request(self, request, worker):
+        downloader = ScrapelDownloader(worker=worker, engine=self)
         gt = worker.spawn(downloader.process_request, request=request)
         gt.link(self.enqueue, worker=worker)
 
-    def process_response(self, response, worker, settings):
-        spider = ScrapelSpider(worker=worker, engine=self, settings=settings)
+    def process_response(self, response, worker):
+        spider = ScrapelSpider(worker=worker, engine=self, settings=worker.settings)
         gt = worker.spawn(spider.process_input, response=response)
         gt.link(self.enqueue, worker=worker)
 
-    def process_item(self, item, worker, settings):
+    def process_item(self, item, worker):
         for pipeline in worker.pipeline:
             result = None
             try:
-                result = pipeline(item=item, settings=settings)
+                result = pipeline(item=item, settings=worker.settings)
             except ItemDropped:
                 pass
             except Exception as exc:

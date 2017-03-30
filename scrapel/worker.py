@@ -114,11 +114,11 @@ class ScrapelWorker(FunctionGetMixin):
         results = []
         for item in iter_iterable(items):
             if isinstance(item, Request):
-                self.engine.process_request(request=item, worker=self, settings=self.settings)
+                self.engine.process_request(request=item, worker=self)
             elif isinstance(item, Response):
-                self.engine.process_response(response=item, worker=self, settings=self.settings)
+                self.engine.process_response(response=item, worker=self)
             elif isinstance(item, self.ScrapelItems):
-                result = self.engine.process_item(item=item, worker=self, settings=self.settings)
+                result = self.engine.process_item(item=item, worker=self)
                 results.extend(maybe_iterable(result))
             elif isinstance(item, types.GeneratorType):
                 self.queue.put(item)

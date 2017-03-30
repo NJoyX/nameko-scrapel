@@ -1,6 +1,6 @@
-import types
 from functools import partial
 
+import types
 from nameko.exceptions import IncorrectSignature
 from nameko.extensions import Entrypoint, register_entrypoint
 from scrapel.constants import (
@@ -21,9 +21,6 @@ __all__ = [
     'SpiderInputMiddleware', 'SpiderOutputMiddleware', 'SpiderExceptionMiddleware'
 ]
 
-raise_notimplemented = partial(NotImplementedError, 'Implement Collector')
-raise_mustimplemented = partial(NotImplementedError, 'Must be implemented')
-
 
 class MiddlewareBase(Entrypoint):
     collector = ScrapelEngine()
@@ -33,8 +30,6 @@ class MiddlewareBase(Entrypoint):
     enabled = None
 
     def start(self):
-        if self.dispatch_uid is None:
-            self.dispatch_uid = self._default_dispatch_uid
         self.collector.register_provider(self)
 
     def stop(self):
@@ -42,17 +37,11 @@ class MiddlewareBase(Entrypoint):
         super(MiddlewareBase, self).stop()
 
     def __init__(self, priority=None, enabled=None, dispatch_uid=None):
-        self.priority = priority or self.priority
         assert self.method in MIDDLEWARE_METHODS, 'Use only predefined methods'
-        self.dispatch_uid = dispatch_uid
+        assert isinstance(priority, (int, float, types.NoneType)), 'Priority must be only integer or float'
+        self.priority = int(9999 if priority < 0 else priority)
         self.enabled = bool(True if enabled is None else enabled)
-
-    @property
-    def _default_dispatch_uid(self):
-        return ':'.join([
-            self.container.service_name,
-            self.method_name
-        ])
+        self.dispatch_uid = dispatch_uid
 
     def process(self, worker, *args, **kwargs):
         try:
