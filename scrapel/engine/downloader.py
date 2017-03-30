@@ -1,5 +1,7 @@
 from __future__ import unicode_literals, print_function, absolute_import
 
+import logging
+
 from scrapel.constants import (
     MIDDLEWARE_DOWNLOADER_REQUEST_METHOD,
     MIDDLEWARE_DOWNLOADER_RESPONSE_METHOD,
@@ -14,6 +16,7 @@ from .mixin import ScrapelProvidersMixin
 
 __author__ = 'Fill Q'
 __all__ = ['ScrapelDownloader']
+logger = logging.getLogger(__name__)
 
 
 class ScrapelDownloader(ScrapelProvidersMixin):
@@ -102,6 +105,7 @@ class ScrapelDownloader(ScrapelProvidersMixin):
         return _response
 
     def process_exception(self, request, exception):
+        logger.error('Downloader process exception.', extra={'stack': True})
         for provider in self.exception_providers:
             _callback = get_callable(provider, 'process')
             if _callback is None:
@@ -133,5 +137,6 @@ class ScrapelDownloader(ScrapelProvidersMixin):
         except (NotImplemented, NotImplementedError):
             return
         except Exception as exc:
+            logger.error('Download error', exc_info=True)
             return self.process_exception(request=request, exception=exc)
         return self.process_response(request=request, response=response)

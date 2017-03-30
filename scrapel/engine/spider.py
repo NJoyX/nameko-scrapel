@@ -1,5 +1,7 @@
 from __future__ import unicode_literals, print_function, absolute_import
 
+import logging
+
 from scrapel import Request, Response
 from scrapel.constants import (
     MIDDLEWARE_SPIDER_INPUT_METHOD,
@@ -11,6 +13,7 @@ from scrapel.utils import get_callable, maybe_iterable
 
 __author__ = 'Fill Q'
 __all__ = ['ScrapelSpider']
+logger = logging.getLogger(__name__)
 
 
 class ScrapelSpider(ScrapelProvidersMixin):
@@ -83,6 +86,7 @@ class ScrapelSpider(ScrapelProvidersMixin):
                 return maybe_iterable(results)
 
     def process_exception(self, response, exception):
+        logger.error('Spider process exception.', extra={'stack': True})
         for provider in self.exception_providers:
             _callback = get_callable(provider, 'process')
             if _callback is None:
@@ -112,6 +116,7 @@ class ScrapelSpider(ScrapelProvidersMixin):
         try:
             results = gt.wait()
         except Exception as exc:
+            logger.error('Scrape error', exc_info=True)
             errback = get_callable(response.request, 'errback')
             if errback:
                 try:
