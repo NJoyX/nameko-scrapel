@@ -1,11 +1,10 @@
 from __future__ import unicode_literals, print_function, absolute_import
 
-import eventlet
 from lazy_object_proxy import Proxy as lazyProxy
+
 from nameko.extensions import ProviderCollector, SharedExtension
 from scrapel import Request, Response
 from scrapel.constants import MIDDLEWARE_METHODS
-from scrapel.exceptions import ItemDropped
 from scrapel.utils import maybe_iterable, iter_iterable
 
 from .downloader import ScrapelDownloader
@@ -42,20 +41,6 @@ class ScrapelEngine(ProviderCollector, SharedExtension):
         spider = ScrapelSpider(worker=worker, engine=self)
         gt = worker.spawn(spider.process_input, response=response)
         gt.link(self.enqueue, worker=worker)
-
-    def process_item(self, item, worker):
-        for pipeline in worker.pipeline:
-            result = None
-            try:
-                result = pipeline(item=item, settings=worker.settings)
-            except ItemDropped:
-                pass
-            except Exception as exc:
-                event = eventlet.Event()
-                worker.spawn(self.enqueue, event, worker=worker)
-                event.send(exc)
-            item = result if isinstance(result, type(item)) else item
-        return item
 
     @staticmethod
     def enqueue(gt, worker):

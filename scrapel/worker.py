@@ -9,10 +9,11 @@ from sortedcontainers import SortedSet
 
 from .constants import JOBID, ALLOWED_DOMAINS
 from .engine import ScrapelEngine
+from .events import ScrapelEventsCollector
 from .http.request import Request
 from .http.response import Response
 from .settings import Settings
-from .utils import maybe_iterable, iter_iterable, FunctionGetMixin
+from .utils import maybe_iterable, iter_iterable, is_listlike
 
 __author__ = 'Fill Q'
 __all__ = ['ScrapelWorker', 'FakeWorker']
@@ -20,8 +21,9 @@ __all__ = ['ScrapelWorker', 'FakeWorker']
 DEFAULT_SET_LOAD = 1000
 
 
-class ScrapelWorker(FunctionGetMixin):
+class ScrapelWorker(object):
     engine = ScrapelEngine()
+    events = ScrapelEventsCollector()
     ScrapelItems = (dict, collections.Mapping)
 
     def __init__(self, context, job_id, allowed_domains, transport_cls, **extra):
@@ -34,6 +36,7 @@ class ScrapelWorker(FunctionGetMixin):
         self.settings.setdefault('PROCESS_UID', self.context.call_id)
         self.settings.update(extra)
         self.engine = self.engine.bind(self.container)
+        self.events = self.events.bind(self.container)
         self.event = eventlet.Event()
         self.pool = eventlet.GreenPool()
         self.queue = eventlet.Queue()
@@ -67,10 +70,10 @@ class ScrapelWorker(FunctionGetMixin):
         if self.is_running:
             self.event.send(result)
 
-        self.map(self.on_stop, results=SortedSet(
+        self.map(self.events.on_stop, worker=self, results=SortedSet(
             self.event.wait() or self.defaultset | result | self.results,
             load=DEFAULT_SET_LOAD
-        ), jid=self.jid)
+        ))
         self.pool.waitall()
 
     def spawn(self, fn, *args, **kwargs):
@@ -92,8 +95,9 @@ class ScrapelWorker(FunctionGetMixin):
         _map.spawn(fn, *args, **kwargs)
         return maybe_iterable(_map)
 
-    def run(self, gt, *args, **kwargs):
-        self.queue.put(self.pile(self.start_requests, jid=self.jid))
+    def run(self):
+        self.events.on_start(worker=self)
+        self.queue.put(self.pile(self.events.start_requests, worker=self))
 
         while True:
             if not self.is_running:
@@ -118,9 +122,9 @@ class ScrapelWorker(FunctionGetMixin):
             elif isinstance(item, Response):
                 self.engine.process_response(response=item, worker=self)
             elif isinstance(item, self.ScrapelItems):
-                result = self.engine.process_item(item=item, worker=self)
+                result = self.events.pipeline(worker=self, item=item)
                 results.extend(maybe_iterable(result))
-            elif isinstance(item, types.GeneratorType):
+            elif isinstance(item, types.GeneratorType) or is_listlike(item):
                 self.queue.put(item)
         return filter(None, results)
 
@@ -141,7 +145,7 @@ class ScrapelWorker(FunctionGetMixin):
             self.results.update(result)
 
 
-class FakeWorker(FunctionGetMixin):
+class FakeWorker(object):
     @property
     def service(self):
         return

@@ -8,18 +8,22 @@ from nameko.extensions import DependencyProvider
 from nameko.utils import SpawningProxy
 
 from .constants import JOBID
-from .exceptions import NoFreeSlotsAvailable
 from .decorators import (
     request_middleware,
     response_middleware,
     exception_middleware,
     spider_input_middleware,
     spider_output_middleware,
-    spider_exception_middleware
+    spider_exception_middleware,
+    on_start,
+    on_stop,
+    pipeline,
+    start_requests
 )
+from .exceptions import NoFreeSlotsAvailable
 from .settings import Settings
 from .transport import BaseTransport, Urllib3Transport
-from .utils import try_int, FunctionSetMixin
+from .utils import try_int
 from .worker import ScrapelWorker, FakeWorker
 
 __author__ = 'Fill Q'
@@ -28,7 +32,7 @@ __author__ = 'Fill Q'
 DEFAULT_MAX_WORKERS = 30
 
 
-class Scrapel(FunctionSetMixin, DependencyProvider):
+class Scrapel(DependencyProvider):
     def __init__(self, allowed_domains, concurrency=None, transport_cls=Urllib3Transport):
         assert isinstance(allowed_domains, (list, tuple)), 'Incorrect format of allowed_domains'
         self.allowed_domains = filter(six.text_type, allowed_domains)
@@ -71,10 +75,9 @@ class Scrapel(FunctionSetMixin, DependencyProvider):
         self.jobs[job_id] = worker
 
         gt = self.container.spawn_managed_thread(
-            partial(worker.on_start, jid=job_id),
+            worker.run,
             identifier='<Scrapel Worker with JobID: {} at {}>'.format(job_id, id(worker))
         )
-        gt.link(worker.run)
         gt.link(lambda _, jid: self.jobs.pop(jid, None), job_id)
         return job_id
 
@@ -108,3 +111,7 @@ class Scrapel(FunctionSetMixin, DependencyProvider):
     spider_input_middleware = spider_input_middleware
     spider_output_middleware = spider_output_middleware
     spider_exception_middleware = spider_exception_middleware
+    on_start = on_start
+    on_stop = on_stop
+    pipeline = pipeline
+    start_requests = start_requests

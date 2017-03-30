@@ -9,10 +9,18 @@ from scrapel.middleware import (
     SpiderExceptionMiddleware
 )
 
+from .events import (
+    on_start,
+    on_stop,
+    pipeline,
+    start_requests
+)
+
 __author__ = 'Fill Q'
 __all__ = [
     'request_middleware', 'response_middleware', 'exception_middleware',
-    'spider_input_middleware', 'spider_output_middleware', 'spider_exception_middleware'
+    'spider_input_middleware', 'spider_output_middleware', 'spider_exception_middleware',
+    'on_start', 'on_stop', 'pipeline', 'start_requests'
 ]
 
 request_middleware = DownloaderRequestMiddleware.decorator
