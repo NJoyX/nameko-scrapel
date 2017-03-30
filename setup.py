@@ -31,7 +31,7 @@ setup(
         'all': extras_all
     },
     include_package_data=True,
-    zip_safe=True,
+    zip_safe=False,
     keywords=['nameko', 'scrape', 'scrapy', 'distributed'],
     classifiers=[
         "Operating System :: MacOS :: MacOS X",

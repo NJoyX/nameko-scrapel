@@ -39,7 +39,7 @@ class ScrapelEngine(ProviderCollector, SharedExtension):
         gt.link(self.enqueue, worker=worker)
 
     def process_response(self, response, worker):
-        spider = ScrapelSpider(worker=worker, engine=self, settings=worker.settings)
+        spider = ScrapelSpider(worker=worker, engine=self)
         gt = worker.spawn(spider.process_input, response=response)
         gt.link(self.enqueue, worker=worker)
 
