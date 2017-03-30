@@ -30,7 +30,7 @@ class MiddlewareBase(Entrypoint):
     priority = 9999
     method = None
     dispatch_uid = None
-    enabled = True
+    enabled = None
 
     def start(self):
         if self.dispatch_uid is None:
@@ -45,7 +45,7 @@ class MiddlewareBase(Entrypoint):
         self.priority = priority or self.priority
         assert self.method in MIDDLEWARE_METHODS, 'Use only predefined methods'
         self.dispatch_uid = dispatch_uid
-        self.enabled = enabled or self.enabled
+        self.enabled = bool(True if enabled is None else enabled)
 
     @property
     def _default_dispatch_uid(self):
